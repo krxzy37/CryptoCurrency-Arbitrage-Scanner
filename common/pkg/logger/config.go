@@ -6,7 +6,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 )
 
-type LoggerConfig struct {
+type Config struct {
 	Level  string `envconfig:"LOGGER_LEVEL" required:"true"`
 	Folder string `envconfig:"LOGGER_FOLDER" required:"true"`
 }
