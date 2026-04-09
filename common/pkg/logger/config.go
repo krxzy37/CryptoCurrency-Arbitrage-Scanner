@@ -11,11 +11,11 @@ type Config struct {
 	Folder string `envconfig:"LOGGER_FOLDER" required:"true"`
 }
 
-func NewConfig() (LoggerConfig, error) {
-	var config LoggerConfig
+func NewConfig() (Config, error) {
+	var config Config
 
 	if err := envconfig.Process("", &config); err != nil {
-		return LoggerConfig{}, fmt.Errorf("envconfig process: %w", err)
+		return Config{}, fmt.Errorf("envconfig process: %w", err)
 	}
 	return config, nil
 }
