@@ -51,3 +51,6 @@ migrate-action:
 		-path //migrations \
 		-database "postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@crypto-scanner-postgres:5432/$(POSTGRES_DB)?sslmode=disable" \
 		"$(action)"
+
+scanner-run:
+	go run common/cmd/arbitrage_scanner/main.go
