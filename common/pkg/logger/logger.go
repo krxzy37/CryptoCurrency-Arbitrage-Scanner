@@ -15,7 +15,7 @@ type Logger struct {
 	file *os.File
 }
 
-func newLogger(config Config) (*Logger, error) {
+func NewLogger(config LoggerConfig) (*Logger, error) {
 	zapLvl := zap.NewAtomicLevel()
 	if err := zapLvl.UnmarshalText([]byte(config.Level)); err != nil {
 		return nil, fmt.Errorf("error parsing log level: %w", err)

@@ -6,16 +6,26 @@ import (
 	"github.com/kelseyhightower/envconfig"
 )
 
-type Config struct {
+type LoggerConfig struct {
 	Level  string `envconfig:"LOGGER_LEVEL" required:"true"`
 	Folder string `envconfig:"LOGGER_FOLDER" required:"true"`
 }
 
-func NewConfig() (Config, error) {
-	var config Config
+func NewConfig() (LoggerConfig, error) {
+	var config LoggerConfig
 
 	if err := envconfig.Process("", &config); err != nil {
-		return Config{}, fmt.Errorf("envconfig process: %w", err)
+		return LoggerConfig{}, fmt.Errorf("envconfig process: %w", err)
 	}
 	return config, nil
+}
+
+func NewConfigMust() LoggerConfig {
+	config, err := NewConfig()
+	if err != nil {
+		err = fmt.Errorf("get logger config: %w", err)
+		panic(err)
+	}
+
+	return config
 }
