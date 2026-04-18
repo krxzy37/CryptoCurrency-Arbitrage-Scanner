@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/VictorLowther/btree"
 	"github.com/gorilla/websocket"
@@ -32,13 +33,73 @@ func NewOrderBook() *OrderBook {
 	}
 }
 
+func getBidByPrice(price float64) btree.CompareAgainst[*OrderBookEntry] {
+	return func(e *OrderBookEntry) int {
+		switch {
+		case e.Price > price:
+
+			return -1
+		case e.Price < price:
+			return 1
+		default:
+			return 0
+		}
+	}
+}
+
+func getAskByPrice(price float64) btree.CompareAgainst[*OrderBookEntry] {
+	return func(e *OrderBookEntry) int {
+		switch {
+		case e.Price < price:
+			return -1
+		case e.Price > price:
+			return 1
+		default:
+			return 0
+		}
+	}
+}
+
 func (ob *OrderBook) handleDepthResponse(res BinanceDepthResult) {
 	for _, ask := range res.Asks {
-		fmt.Println(ask)
+
+		price, _ := strconv.ParseFloat(ask[0], 64)
+		volume, _ := strconv.ParseFloat(ask[1], 64)
+		if volume == 0 {
+			if entry, ok := ob.Asks.Get(getAskByPrice(price)); ok {
+				fmt.Printf("-- deleting level %.2f", price)
+				ob.Asks.Delete(entry)
+			}
+			continue
+		}
+		entry := OrderBookEntry{
+			Price:  price,
+			Volume: volume,
+		}
+		ob.Asks.Insert(&entry)
+	}
+	for _, bid := range res.Bids {
+
+		price, _ := strconv.ParseFloat(bid[0], 64)
+		volume, _ := strconv.ParseFloat(bid[1], 64)
+		if volume == 0 {
+			if thing, ok := ob.Bids.Get(getBidByPrice(price)); ok {
+				fmt.Printf("-- deleting level %.2f", price)
+				ob.Bids.Delete(thing)
+			}
+			continue
+		}
+		entry := OrderBookEntry{
+			Price:  price,
+			Volume: volume,
+		}
+		ob.Bids.Insert(&entry)
 	}
 }
 
 type BinanceDepthResult struct {
+
+	//price | size (volume)
 	Asks [][]string `json:"a"`
 	Bids [][]string `json:"b"`
 }
@@ -64,5 +125,10 @@ func BinanceConnect() {
 		}
 
 		ob.handleDepthResponse(result.Data)
+		it := ob.Asks.Iterator(nil, nil)
+		for it.Next() {
+
+			fmt.Printf("%+v\n", it.Item())
+		}
 	}
 }
