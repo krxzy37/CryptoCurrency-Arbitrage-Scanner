@@ -3,7 +3,7 @@ package main
 import (
 	"time"
 
-	internal "github.com/krzy37/arbitrage-scanner/common/internal/connect"
+	internal "github.com/krzy37/arbitrage-scanner/common/internal/exchange/binance"
 )
 
 func main() {
