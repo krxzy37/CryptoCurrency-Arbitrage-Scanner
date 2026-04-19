@@ -3,7 +3,7 @@ package main
 import (
 	"time"
 
-	internal "github.com/krzy37/arbitrage-scanner/common/internal/exchange/binance"
+	"github.com/krzy37/arbitrage-scanner/common/internal/exchange/binance"
 )
 
 func main() {
@@ -20,7 +20,7 @@ func main() {
 
 		logger.Info("logger init success")
 	*/
-	internal.BinanceConnect()
+	binance.Connect()
 
 	time.Sleep(time.Duration(5) * time.Second)
 }
