@@ -3,6 +3,7 @@ package binance
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/VictorLowther/btree"
 	"github.com/gorilla/websocket"
@@ -11,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const wsendpoint = "wss://stream.binance.com:9443/stream?streams=btcusdt@depth"
+//const wsendpoint = "wss://stream.binance.com:9443/stream?streams=btcusdt@depth"
 
 type Client struct {
 	logger *shared.Logger
@@ -81,8 +82,8 @@ func (c *Client) updateSide(
 	}
 }
 
-func (c *Client) Connect() error {
-	conn, _, err := websocket.DefaultDialer.Dial(wsendpoint, nil)
+func (c *Client) Connect(endpoint string) error {
+	conn, _, err := websocket.DefaultDialer.Dial(endpoint, nil)
 	if err != nil {
 		c.logger.Fatal("websocket default dial err", zap.Error(err))
 		panic(err)
@@ -105,4 +106,24 @@ func (c *Client) Connect() error {
 			fmt.Printf("%+v\n", it.Item())
 		}
 	}
+}
+
+func CreateURLStream(stream ...string) string {
+	baseEndPoint := "wss://stream.binance.com:9443/stream?streams="
+
+	var builder strings.Builder
+
+	builder.WriteString(baseEndPoint)
+
+	for i := 0; i < len(stream); i++ {
+		builder.WriteString(stream[i])
+		builder.WriteString("@depth")
+
+		if i != len(stream)-1 {
+			builder.WriteString("/")
+		}
+
+	}
+
+	return builder.String()
 }

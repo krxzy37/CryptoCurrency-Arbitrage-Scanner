@@ -22,10 +22,11 @@ func main() {
 	}()
 
 	logger.Info("logger init success")
-
 	client := binance.NewClient(logger)
 
-	if err := client.Connect(); err != nil {
+	endpoint := binance.CreateURLStream("btcusdt", "ethusdt")
+
+	if err := client.Connect(endpoint); err != nil {
 		logger.Error("binance connect err", zap.Error(err))
 	}
 
