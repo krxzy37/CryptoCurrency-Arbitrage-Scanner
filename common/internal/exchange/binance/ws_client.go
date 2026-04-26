@@ -7,9 +7,23 @@ import (
 	"github.com/VictorLowther/btree"
 	"github.com/gorilla/websocket"
 	"github.com/krzy37/arbitrage-scanner/common/internal/domain"
+	shared "github.com/krzy37/arbitrage-scanner/common/pkg/logger"
+	"go.uber.org/zap"
 )
 
 const wsendpoint = "wss://stream.binance.com:9443/stream?streams=btcusdt@depth"
+
+type Client struct {
+	logger *shared.Logger
+	ob     *domain.OrderBook
+}
+
+func NewClient(logger *shared.Logger) *Client {
+	return &Client{
+		logger: logger,
+		ob:     domain.NewOrderBook(),
+	}
+}
 
 func getBidByPrice(price float64) btree.CompareAgainst[*domain.OrderBookEntry] {
 	return func(e *domain.OrderBookEntry) int {
@@ -38,44 +52,13 @@ func getAskByPrice(price float64) btree.CompareAgainst[*domain.OrderBookEntry] {
 	}
 }
 
-func handleDepthResponse(ob *domain.OrderBook, res BinanceDepthResult) {
-	for _, ask := range res.Asks {
-		price, _ := strconv.ParseFloat(ask[0], 64)
-		volume, _ := strconv.ParseFloat(ask[1], 64)
-		if volume == 0 {
-			if entry, ok := ob.Asks.Get(getAskByPrice(price)); ok {
-				fmt.Printf("-- deleting level %.2f\n", price)
-				ob.Asks.Delete(entry)
-			}
-			continue
-		}
-		entry := domain.OrderBookEntry{ // Используем пакет domain
-			Price:  price,
-			Volume: volume,
-		}
-		ob.Asks.Insert(&entry)
-	}
-	for _, bid := range res.Bids {
-		price, _ := strconv.ParseFloat(bid[0], 64)
-		volume, _ := strconv.ParseFloat(bid[1], 64)
-		if volume == 0 {
-			if thing, ok := ob.Bids.Get(getBidByPrice(price)); ok {
-				fmt.Printf("-- deleting level %.2f\n", price)
-				ob.Bids.Delete(thing)
-			}
-			continue
-		}
-		entry := domain.OrderBookEntry{
-			Price:  price,
-			Volume: volume,
-		}
-		ob.Bids.Insert(&entry)
-	}
+func (c *Client) handleDepthResponse(ob *domain.OrderBook, res DepthResult) {
+	c.updateSide(ob.Asks, res.Asks, getAskByPrice)
+	c.updateSide(ob.Bids, res.Bids, getBidByPrice)
 }
 
-// ИСПРАВЛЕНИЕ: Также превращаем в обычную функцию
-func updateSide(
-	tree btree.Tree[*domain.OrderBookEntry],
+func (c *Client) updateSide(
+	tree *btree.Tree[*domain.OrderBookEntry],
 	updates [][]string,
 	getCompareFunc func(float64) btree.CompareAgainst[*domain.OrderBookEntry]) {
 	for _, item := range updates {
@@ -98,23 +81,24 @@ func updateSide(
 	}
 }
 
-func Connect() {
+func (c *Client) Connect() error {
 	conn, _, err := websocket.DefaultDialer.Dial(wsendpoint, nil)
 	if err != nil {
-		err = fmt.Errorf("websocket default dial err: %w", err)
+		c.logger.Fatal("websocket default dial err", zap.Error(err))
 		panic(err)
 	}
 
 	var (
 		ob     = domain.NewOrderBook()
-		result BinanceDepthResponse
+		result DepthResponse
 	)
 	for {
 		if err := conn.ReadJSON(&result); err != nil {
-			panic(err)
+			c.logger.Error("failed to read message from websocket", zap.Error(err))
+			return err
 		}
 
-		handleDepthResponse(ob, result.Data)
+		c.handleDepthResponse(ob, result.Data)
 		it := ob.Asks.Iterator(nil, nil)
 		for it.Next() {
 

@@ -1,13 +1,13 @@
 package binance
 
-type BinanceDepthResult struct {
+type DepthResult struct {
 
 	//price | size (volume)
 	Asks [][]string `json:"a"`
 	Bids [][]string `json:"b"`
 }
 
-type BinanceDepthResponse struct {
-	Stream string             `json:"stream"`
-	Data   BinanceDepthResult `json:"data"`
+type DepthResponse struct {
+	Stream string      `json:"stream"`
+	Data   DepthResult `json:"data"`
 }
