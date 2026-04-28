@@ -1,6 +1,15 @@
 package domain
 
-import "github.com/VictorLowther/btree"
+import (
+	"sync"
+
+	"github.com/VictorLowther/btree"
+)
+
+type OrderBookManager struct {
+	mu    sync.RWMutex
+	books *map[string]OrderBook
+}
 
 type OrderBookEntry struct {
 	Price  float64
@@ -24,4 +33,10 @@ func byBestBid(a, b *OrderBookEntry) bool {
 }
 func byBestAsk(a, b *OrderBookEntry) bool {
 	return a.Price < b.Price
+}
+
+func NewOrderBookManager() *OrderBookManager {
+	return &OrderBookManager{
+		books: &map[string]OrderBook{},
+	}
 }

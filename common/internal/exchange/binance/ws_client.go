@@ -12,17 +12,15 @@ import (
 	"go.uber.org/zap"
 )
 
-//const wsendpoint = "wss://stream.binance.com:9443/stream?streams=btcusdt@depth"
-
 type Client struct {
-	logger *shared.Logger
-	ob     *domain.OrderBook
+	logger  *shared.Logger
+	manager *domain.OrderBookManager
 }
 
 func NewClient(logger *shared.Logger) *Client {
 	return &Client{
-		logger: logger,
-		ob:     domain.NewOrderBook(),
+		logger:  logger,
+		manager: domain.NewOrderBookManager(),
 	}
 }
 
@@ -53,9 +51,9 @@ func getAskByPrice(price float64) btree.CompareAgainst[*domain.OrderBookEntry] {
 	}
 }
 
-func (c *Client) handleDepthResponse(ob *domain.OrderBook, res DepthResult) {
-	c.updateSide(ob.Asks, res.Asks, getAskByPrice)
-	c.updateSide(ob.Bids, res.Bids, getBidByPrice)
+func (c *Client) handleDepthResponse(manager *domain.OrderBook, res DepthResult) {
+	c.updateSide(manager.Asks, res.Asks, getAskByPrice)
+	c.updateSide(manager.Bids, res.Bids, getBidByPrice)
 }
 
 func (c *Client) updateSide(
@@ -90,8 +88,8 @@ func (c *Client) Connect(endpoint string) error {
 	}
 
 	var (
-		ob     = domain.NewOrderBook()
-		result DepthResponse
+		manager = domain.NewOrderBook()
+		result  DepthResponse
 	)
 	for {
 		if err := conn.ReadJSON(&result); err != nil {
@@ -99,8 +97,8 @@ func (c *Client) Connect(endpoint string) error {
 			return err
 		}
 
-		c.handleDepthResponse(ob, result.Data)
-		it := ob.Asks.Iterator(nil, nil)
+		c.handleDepthResponse(manager, result.Data)
+		it := manager.Asks.Iterator(nil, nil)
 		for it.Next() {
 
 			fmt.Printf("%+v\n", it.Item())
