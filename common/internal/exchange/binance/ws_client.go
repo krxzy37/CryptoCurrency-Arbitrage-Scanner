@@ -29,9 +29,9 @@ func getBidByPrice(price float64) btree.CompareAgainst[*domain.OrderBookEntry] {
 		switch {
 		case e.Price > price:
 
-			return -1
-		case e.Price < price:
 			return 1
+		case e.Price < price:
+			return -1
 		default:
 			return 0
 		}
@@ -42,9 +42,9 @@ func getAskByPrice(price float64) btree.CompareAgainst[*domain.OrderBookEntry] {
 	return func(e *domain.OrderBookEntry) int {
 		switch {
 		case e.Price < price:
-			return -1
-		case e.Price > price:
 			return 1
+		case e.Price > price:
+			return -1
 		default:
 			return 0
 		}
@@ -87,22 +87,19 @@ func (c *Client) Connect(endpoint string) error {
 		panic(err)
 	}
 
-	var (
-		manager = domain.NewOrderBook()
-		result  DepthResponse
-	)
+	var result DepthResponse
 	for {
 		if err := conn.ReadJSON(&result); err != nil {
 			c.logger.Error("failed to read message from websocket", zap.Error(err))
 			return err
 		}
+		symbol := strings.Split(result.Stream, "@")[0]
+		targetBook := c.manager.GetOrCreateOrderBookManager(symbol)
 
-		c.handleDepthResponse(manager, result.Data)
-		it := manager.Asks.Iterator(nil, nil)
-		for it.Next() {
+		fmt.Printf("Торговая пара: %v,\n %+v\n", symbol, targetBook)
 
-			fmt.Printf("%+v\n", it.Item())
-		}
+		c.handleDepthResponse(targetBook, result.Data)
+
 	}
 }
 
