@@ -61,8 +61,16 @@ func (c *Client) updateSide(
 	updates [][]string,
 	getCompareFunc func(float64) btree.CompareAgainst[*domain.OrderBookEntry]) {
 	for _, item := range updates {
-		price, _ := strconv.ParseFloat(item[0], 64)
-		volume, _ := strconv.ParseFloat(item[1], 64)
+		price, err := strconv.ParseFloat(item[0], 64)
+		if err != nil {
+			c.logger.Warn("Failed to parse price", zap.Error(err))
+			return
+		}
+		volume, err := strconv.ParseFloat(item[1], 64)
+		if err != nil {
+			c.logger.Warn("Failed to parse volume", zap.Error(err))
+			return
+		}
 
 		if volume == 0 {
 			if entry, ok := tree.Get(getCompareFunc(price)); ok {
@@ -112,7 +120,7 @@ func CreateURLStream(stream ...string) string {
 
 	for i := 0; i < len(stream); i++ {
 		builder.WriteString(stream[i])
-		builder.WriteString("@depth")
+		builder.WriteString("@depth20")
 
 		if i != len(stream)-1 {
 			builder.WriteString("/")
