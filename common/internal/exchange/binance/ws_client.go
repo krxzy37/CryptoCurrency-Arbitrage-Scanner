@@ -2,8 +2,10 @@ package binance
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/VictorLowther/btree"
 	"github.com/gorilla/websocket"
@@ -11,6 +13,58 @@ import (
 	shared "github.com/krzy37/arbitrage-scanner/common/pkg/logger"
 	"go.uber.org/zap"
 )
+
+const (
+	pongWait = 20 * time.Second
+)
+
+var testChan = make(chan []byte, 100)
+
+type RingBuffer struct {
+	data       []*Data
+	size       int
+	lastInsert int
+	nextRead   int
+	emitTime   time.Time
+}
+
+func NewRingBuffer(size int) *RingBuffer {
+	return &RingBuffer{
+		data:       make([]*Data, size),
+		size:       size,
+		lastInsert: -1,
+	}
+}
+
+func (r *RingBuffer) Insert(input Data) {
+
+	r.lastInsert = (r.lastInsert + 1) % r.size
+	r.data[r.lastInsert] = &input
+
+	if r.nextRead == r.lastInsert {
+		r.nextRead = (r.nextRead + 1) % r.size
+	}
+}
+
+func (r *RingBuffer) Emit() []*Data {
+	output := make([]*Data, r.size)
+	for {
+		if r.data[r.nextRead] != nil {
+			output = append(output, r.data[r.nextRead])
+			r.data[r.nextRead] = nil
+		}
+		if r.nextRead == r.lastInsert || r.lastInsert == -1 {
+			break
+		}
+		r.nextRead = (r.nextRead + 1) % r.size
+	}
+	return output
+}
+
+type Data struct {
+	stamp time.Time
+	data  []*DepthResponse
+}
 
 type Client struct {
 	logger  *shared.Logger
@@ -95,18 +149,9 @@ func (c *Client) Connect(endpoint string) error {
 		panic(err)
 	}
 
-	var result DepthResponse
 	for {
-		if err := conn.ReadJSON(&result); err != nil {
-			c.logger.Error("failed to read message from websocket", zap.Error(err))
-			return err
-		}
-		symbol := strings.Split(result.Stream, "@")[0]
-		targetBook := c.manager.GetOrCreateOrderBookManager(symbol)
 
-		fmt.Printf("Торговая пара: %v,\n %+v\n", symbol, targetBook)
-
-		c.handleDepthResponse(targetBook, result.Data)
+		go c.ReadPump(conn, testChan)
 
 	}
 }
@@ -129,4 +174,48 @@ func CreateURLStream(stream ...string) string {
 	}
 
 	return builder.String()
+}
+
+func (c *Client) ReadPump(conn *websocket.Conn, messageChan chan<- []byte) {
+	defer func() {
+		if err := conn.Close(); err != nil {
+			fmt.Printf("Failed to close connection: %v", err)
+		}
+	}()
+
+	conn.SetReadLimit(4096)
+	if err := conn.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
+		fmt.Printf("Failed to set read deadline: %v", err)
+		return
+	}
+	conn.SetPongHandler(func(string) error {
+		if err := conn.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
+			fmt.Printf("Failed to set read deadline: %v", err)
+			return err
+		}
+		return nil
+	})
+
+	var result DepthResponse
+
+	for {
+		_, message, err := conn.ReadMessage()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("Unexpected websocket close error: %v", err)
+			}
+			break
+		}
+		if err = conn.ReadJSON(&result); err != nil {
+			c.logger.Error("failed to read message from websocket", zap.Error(err))
+			return
+		}
+
+		symbol := strings.Split(result.Stream, "@")[0]
+		targetBook := c.manager.GetOrCreateOrderBookManager(symbol)
+		fmt.Printf("Торговая пара: %v,\n %+v\n", symbol, targetBook)
+
+		messageChan <- message
+
+	}
 }
